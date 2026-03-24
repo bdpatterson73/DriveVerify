@@ -363,7 +363,7 @@ public class MainViewModel : INotifyPropertyChanged
             });
 
             var writer = new FileTestWriterService();
-            writeResult = await writer.WriteAsync(plan, writeProgress, ct);
+            writeResult = await Task.Run(() => writer.WriteAsync(plan, writeProgress, ct));
 
             Log($"=== Write Phase Complete: {SizeFormatter.Format(writeResult.TotalBytesWritten)} in {TimeFormatter.Format(writeResult.ElapsedTime)} ({SizeFormatter.Format((long)writeResult.AverageSpeedBytesPerSec)}/s) ===");
 
@@ -411,7 +411,7 @@ public class MainViewModel : INotifyPropertyChanged
             });
 
             var verifier = new FileTestVerifierService();
-            verifyResult = await verifier.VerifyAsync(plan, verifyProgress, ct);
+            verifyResult = await Task.Run(() => verifier.VerifyAsync(plan, verifyProgress, ct));
 
             Log($"=== Verify Phase Complete: {SizeFormatter.Format(verifyResult.TotalBytesVerified)} in {TimeFormatter.Format(verifyResult.ElapsedTime)} ({SizeFormatter.Format((long)verifyResult.AverageSpeedBytesPerSec)}/s) ===");
 

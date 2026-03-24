@@ -53,19 +53,23 @@ public class FileTestWriterService
         try
         {
             int[] blockIndices = GetBlockIndices(plan, totalBlocks);
+            int payloadLength = plan.BlockSizeBytes - TestBlockHeader.SerializedSize;
+            int blockTotalSize = TestBlockHeader.SerializedSize + payloadLength;
+            byte[] blockBuffer = new byte[plan.BlockSizeBytes];
 
             for (int i = 0; i < blockIndices.Length; i++)
             {
                 ct.ThrowIfCancellationRequested();
 
                 int blockIndex = blockIndices[i];
-                int payloadLength = plan.BlockSizeBytes - TestBlockHeader.SerializedSize;
                 long absoluteOffset = (long)blockIndex * plan.BlockSizeBytes;
 
-                // Generate payload
-                byte[] payload = TestPatternService.GeneratePayload(
-                    plan.SessionId, blockIndex, absoluteOffset, payloadLength);
-                uint checksum = ChecksumService.Compute(payload);
+                // Generate payload directly into block buffer (no allocation)
+                TestPatternService.GeneratePayloadInto(
+                    plan.SessionId, blockIndex, absoluteOffset,
+                    blockBuffer.AsSpan(TestBlockHeader.SerializedSize, payloadLength));
+                uint checksum = ChecksumService.Compute(
+                    blockBuffer.AsSpan(TestBlockHeader.SerializedSize, payloadLength));
 
                 // Build header
                 var header = new TestBlockHeader
@@ -79,30 +83,29 @@ public class FileTestWriterService
                     PayloadChecksum = checksum
                 };
 
-                byte[] headerBytes = new byte[TestBlockHeader.SerializedSize];
-                header.Serialize(headerBytes);
-
                 // Check if we need a new file
-                int blockTotalSize = TestBlockHeader.SerializedSize + payloadLength;
                 if (currentStream == null || currentFileSize + blockTotalSize > fileSizeLimit)
                 {
                     if (currentStream != null)
                     {
-                        await currentStream.FlushAsync(ct);
-                        await currentStream.DisposeAsync();
+                        await currentStream.FlushAsync(ct).ConfigureAwait(false);
+                        await currentStream.DisposeAsync().ConfigureAwait(false);
                         result.FileCount++;
                         fileIndex++;  // Increment for next file
                     }
 
                     string filePath = Path.Combine(plan.TestFolderPath, $"testdata_{fileIndex:D4}.dat");
                     currentStream = new FileStream(filePath, FileMode.Create, FileAccess.Write,
-                        FileShare.None, bufferSize: 65536, useAsync: true);
+                        FileShare.None, bufferSize: 4096,
+                        FileOptions.SequentialScan | FileOptions.Asynchronous);
                     currentFileSize = 0;
 
                     // Update fileIndex in header
                     header.FileIndex = fileIndex;
-                    header.Serialize(headerBytes);
                 }
+
+                // Serialize header into start of block buffer
+                header.Serialize(blockBuffer);
 
                 // Report "Writing" status before actually writing
                 progress.Report(new WriteProgress
@@ -119,9 +122,8 @@ public class FileTestWriterService
                     IsWriting = true
                 });
 
-                // Write header + payload
-                await currentStream!.WriteAsync(headerBytes, ct);
-                await currentStream.WriteAsync(payload, ct);
+                // Write entire block in a single I/O operation
+                await currentStream!.WriteAsync(blockBuffer.AsMemory(0, blockTotalSize), ct).ConfigureAwait(false);
                 currentFileSize += blockTotalSize;
                 totalBytesWritten += blockTotalSize;
 
@@ -163,10 +165,10 @@ public class FileTestWriterService
             {
                 try
                 {
-                    await currentStream.FlushAsync(CancellationToken.None);
+                    await currentStream.FlushAsync(CancellationToken.None).ConfigureAwait(false);
                 }
                 catch { }
-                await currentStream.DisposeAsync();
+                await currentStream.DisposeAsync().ConfigureAwait(false);
                 result.FileCount++;
             }
         }

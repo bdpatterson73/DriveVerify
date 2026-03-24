@@ -64,10 +64,14 @@ public class FileTestVerifierService
 
             try
             {
-                await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read,
-                    FileShare.Read, bufferSize: 65536, useAsync: true);
+            await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read,
+                    FileShare.Read, bufferSize: 65536,
+                    FileOptions.SequentialScan | FileOptions.Asynchronous);
 
                 byte[] headerBuffer = new byte[TestBlockHeader.SerializedSize];
+                int maxPayloadLength = plan.BlockSizeBytes - TestBlockHeader.SerializedSize;
+                byte[] payloadBuffer = new byte[maxPayloadLength];
+                byte[] expectedBuffer = new byte[maxPayloadLength];
 
                 while (stream.Position < stream.Length)
                 {
@@ -179,8 +183,8 @@ public class FileTestVerifierService
                         break;
                     }
 
-                    byte[] payloadBuffer = new byte[header.PayloadLength];
-                    int payloadBytesRead = await ReadFullAsync(stream, payloadBuffer, token);
+                    int payloadBytesRead = await ReadFullAsync(stream,
+                        payloadBuffer.AsMemory(0, header.PayloadLength), token);
 
                     if (payloadBytesRead < header.PayloadLength)
                     {
@@ -211,13 +215,14 @@ public class FileTestVerifierService
                         }
 
                         // Compare against expected payload
-                        byte[] expected = TestPatternService.GenerateExpectedPayload(
-                            header.SessionId, header.BlockIndex, header.AbsoluteOffset, header.PayloadLength);
+                        TestPatternService.GeneratePayloadInto(
+                            header.SessionId, header.BlockIndex, header.AbsoluteOffset,
+                            expectedBuffer.AsSpan(0, header.PayloadLength));
 
-                        if (!payloadBuffer.AsSpan(0, payloadBytesRead).SequenceEqual(expected.AsSpan(0, payloadBytesRead)))
+                        if (!payloadBuffer.AsSpan(0, payloadBytesRead).SequenceEqual(expectedBuffer.AsSpan(0, payloadBytesRead)))
                         {
                             // Check for wrap/duplicate pattern
-                            bool isDuplicate = DetectWrapPattern(payloadBuffer, expected, payloadBytesRead);
+                            bool isDuplicate = DetectWrapPattern(payloadBuffer, expectedBuffer, payloadBytesRead);
                             issues.Add(new VerificationIssue
                             {
                                 BlockIndex = header.BlockIndex,
@@ -324,13 +329,13 @@ public class FileTestVerifierService
         return mismatchRate > 0.5;
     }
 
-    private static async Task<int> ReadFullAsync(FileStream stream, byte[] buffer, CancellationToken ct)
+    private static async Task<int> ReadFullAsync(FileStream stream, Memory<byte> buffer, CancellationToken ct)
     {
         int totalRead = 0;
         while (totalRead < buffer.Length)
         {
             int bytesRead = await stream.ReadAsync(
-                buffer.AsMemory(totalRead, buffer.Length - totalRead), ct);
+                buffer.Slice(totalRead), ct);
             if (bytesRead == 0) break;
             totalRead += bytesRead;
         }
