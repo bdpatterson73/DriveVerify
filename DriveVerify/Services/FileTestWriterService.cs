@@ -91,14 +91,13 @@ public class FileTestWriterService
                         await currentStream.FlushAsync(ct);
                         await currentStream.DisposeAsync();
                         result.FileCount++;
+                        fileIndex++;  // Increment for next file
                     }
 
                     string filePath = Path.Combine(plan.TestFolderPath, $"testdata_{fileIndex:D4}.dat");
                     currentStream = new FileStream(filePath, FileMode.Create, FileAccess.Write,
                         FileShare.None, bufferSize: 65536, useAsync: true);
                     currentFileSize = 0;
-                    if (result.FileCount > 0 || i > 0)
-                        fileIndex++;
 
                     // Update fileIndex in header
                     header.FileIndex = fileIndex;
@@ -156,6 +155,7 @@ public class FileTestWriterService
         catch (Exception ex)
         {
             result.Exceptions.Add(ex);
+            // Exception will end the write phase - partial results will be returned
         }
         finally
         {

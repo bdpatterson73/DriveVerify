@@ -335,31 +335,31 @@ public class MainViewModel : INotifyPropertyChanged
 
             var writeProgress = new Progress<WriteProgress>(p =>
             {
-                double pct = p.TotalBytes > 0 ? (double)p.BytesWritten / p.TotalBytes * 100 : 0;
-                ProgressPercent = pct;
-                SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
-                ElapsedText = TimeFormatter.Format(p.Elapsed);
-                EtaText = TimeFormatter.Format(p.EstimatedRemaining);
-                BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks}";
-
                 if (p.RegionIndex >= 0 && p.RegionIndex < RegionStatuses!.Length)
                 {
                     if (p.IsWriting)
                     {
-                        // Set to blue "Writing" status
+                        // Set to blue "Writing" status (don't update stats yet)
                         RegionStatuses[p.RegionIndex] = RegionStatus.Writing;
+                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
                     }
                     else
                     {
-                        // Set to green "Good" after write completes
-                        RegionStatuses[p.RegionIndex] = RegionStatus.Good;
-                    }
-                    // Force WPF to detect change by creating new array reference
-                    RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
-                }
+                        // Write complete - update stats and set to green "Good"
+                        double pct = p.TotalBytes > 0 ? (double)p.BytesWritten / p.TotalBytes * 100 : 0;
+                        ProgressPercent = pct;
+                        SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
+                        ElapsedText = TimeFormatter.Format(p.Elapsed);
+                        EtaText = TimeFormatter.Format(p.EstimatedRemaining);
+                        BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks}";
 
-                if (p.BlockIndex % 100 == 0)
-                    Log($"Writing block {p.BlockIndex + 1}/{totalBlocks} — {SizeFormatter.Format(p.BytesWritten)} — {SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s");
+                        RegionStatuses[p.RegionIndex] = RegionStatus.Good;
+                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
+
+                        if (p.BlockIndex % 100 == 0)
+                            Log($"Writing block {p.BlockIndex + 1}/{totalBlocks} — {SizeFormatter.Format(p.BytesWritten)} — {SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s");
+                    }
+                }
             });
 
             var writer = new FileTestWriterService();
@@ -383,31 +383,31 @@ public class MainViewModel : INotifyPropertyChanged
 
             var verifyProgress = new Progress<VerifyProgress>(p =>
             {
-                double pct = p.TotalBytes > 0 ? (double)p.BytesVerified / p.TotalBytes * 100 : 0;
-                ProgressPercent = pct;
-                SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
-                ElapsedText = TimeFormatter.Format(p.Elapsed);
-                EtaText = TimeFormatter.Format(p.EstimatedRemaining);
-                BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks} ({p.IssueCount} issues)";
-
                 if (p.RegionIndex >= 0 && p.RegionIndex < RegionStatuses!.Length)
                 {
                     if (p.IsVerifying)
                     {
-                        // Set to orange "Verifying" status
+                        // Set to orange "Verifying" status (don't update stats yet)
                         RegionStatuses[p.RegionIndex] = RegionStatus.Verifying;
+                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
                     }
                     else
                     {
-                        // Set final status after verification complete
-                        RegionStatuses[p.RegionIndex] = p.RegionFailed ? RegionStatus.Bad : RegionStatus.Good;
-                    }
-                    // Force WPF to detect change by creating new array reference
-                    RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
-                }
+                        // Verification complete - update stats and set final status
+                        double pct = p.TotalBytes > 0 ? (double)p.BytesVerified / p.TotalBytes * 100 : 0;
+                        ProgressPercent = pct;
+                        SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
+                        ElapsedText = TimeFormatter.Format(p.Elapsed);
+                        EtaText = TimeFormatter.Format(p.EstimatedRemaining);
+                        BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks} ({p.IssueCount} issues)";
 
-                if (p.BlockIndex % 100 == 0)
-                    Log($"Verifying block {p.BlockIndex + 1}/{totalBlocks} — {SizeFormatter.Format(p.BytesVerified)} — {p.IssueCount} issues");
+                        RegionStatuses[p.RegionIndex] = p.RegionFailed ? RegionStatus.Bad : RegionStatus.Good;
+                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
+
+                        if (p.BlockIndex % 100 == 0)
+                            Log($"Verifying block {p.BlockIndex + 1}/{totalBlocks} — {SizeFormatter.Format(p.BytesVerified)} — {p.IssueCount} issues");
+                    }
+                }
             });
 
             var verifier = new FileTestVerifierService();
@@ -469,17 +469,21 @@ public class MainViewModel : INotifyPropertyChanged
                 Log($"First failure at offset: {SizeFormatter.Format(verifyResult.FirstFailureOffset.Value)}");
         }
 
-        // Generate report
+        // Generate report (save to Documents folder, not test drive)
         try
         {
+            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string reportFolder = Path.Combine(documentsPath, "FlashDriveTester Reports");
+            Directory.CreateDirectory(reportFolder);
+
             var reportModel = BuildReportModel(plan, testResult);
             string html = HtmlReportService.GenerateReport(reportModel);
-            _lastReportPath = await HtmlReportService.SaveAndOpenAsync(html, plan.TestFolderPath);
+            _lastReportPath = await HtmlReportService.SaveAndOpenAsync(html, reportFolder);
             OpenReportCommand.RaiseCanExecuteChanged();
             Log($"Report saved: {_lastReportPath}");
 
-            // Also save log file
-            await SaveLogFileAsync(plan.TestFolderPath);
+            // Also save log file to Documents
+            await SaveLogFileAsync(reportFolder);
         }
         catch (Exception ex)
         {
