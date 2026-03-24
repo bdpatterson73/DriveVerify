@@ -14,6 +14,7 @@ public class WriteProgress
     public TimeSpan Elapsed { get; set; }
     public TimeSpan EstimatedRemaining { get; set; }
     public int RegionIndex { get; set; }
+    public bool IsWriting { get; set; }
 }
 
 public class WritePhaseResult
@@ -104,13 +105,28 @@ public class FileTestWriterService
                     header.Serialize(headerBytes);
                 }
 
+                // Report "Writing" status before actually writing
+                progress.Report(new WriteProgress
+                {
+                    Phase = "Writing",
+                    FileIndex = fileIndex,
+                    BlockIndex = blockIndex,
+                    BytesWritten = totalBytesWritten,
+                    TotalBytes = plan.TestSizeBytes,
+                    SpeedBytesPerSec = 0,
+                    Elapsed = stopwatch.Elapsed,
+                    EstimatedRemaining = TimeSpan.Zero,
+                    RegionIndex = blockIndex,
+                    IsWriting = true
+                });
+
                 // Write header + payload
                 await currentStream!.WriteAsync(headerBytes, ct);
                 await currentStream.WriteAsync(payload, ct);
                 currentFileSize += blockTotalSize;
                 totalBytesWritten += blockTotalSize;
 
-                // Report progress
+                // Report progress after write complete
                 double elapsed = stopwatch.Elapsed.TotalSeconds;
                 double speed = elapsed > 0 ? totalBytesWritten / elapsed : 0;
                 double fraction = (double)(i + 1) / blockIndices.Length;
@@ -128,7 +144,8 @@ public class FileTestWriterService
                     SpeedBytesPerSec = speed,
                     Elapsed = stopwatch.Elapsed,
                     EstimatedRemaining = eta,
-                    RegionIndex = blockIndex
+                    RegionIndex = blockIndex,
+                    IsWriting = false
                 });
             }
         }

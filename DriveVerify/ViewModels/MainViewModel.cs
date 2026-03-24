@@ -344,7 +344,16 @@ public class MainViewModel : INotifyPropertyChanged
 
                 if (p.RegionIndex >= 0 && p.RegionIndex < RegionStatuses!.Length)
                 {
-                    RegionStatuses[p.RegionIndex] = RegionStatus.Good;
+                    if (p.IsWriting)
+                    {
+                        // Set to blue "Writing" status
+                        RegionStatuses[p.RegionIndex] = RegionStatus.Writing;
+                    }
+                    else
+                    {
+                        // Set to green "Good" after write completes
+                        RegionStatuses[p.RegionIndex] = RegionStatus.Good;
+                    }
                     // Force WPF to detect change by creating new array reference
                     RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
                 }
