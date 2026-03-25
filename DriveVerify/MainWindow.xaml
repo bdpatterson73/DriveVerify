@@ -97,6 +97,15 @@
                                 Command="{Binding CancelCommand}"
                                 Width="90" />
                     </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button Content="📄 Open Report"
+                                Command="{Binding OpenReportCommand}"
+                                Margin="0,0,8,0"
+                                ToolTip="Open the HTML test report" />
+                        <Button Content="🗑 Clean Up Test Files"
+                                Command="{Binding CleanUpCommand}"
+                                ToolTip="Delete all test files from the drive" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>
@@ -158,23 +167,10 @@
         <Border Grid.Row="3" Background="{Binding VerdictBrush}" CornerRadius="8" Padding="16"
                 Margin="0,0,0,12"
                 Visibility="{Binding VerdictVisibility}">
-            <Grid>
-                <TextBlock Text="{Binding VerdictText}"
-                           Foreground="{Binding VerdictForeground}"
-                           FontSize="22" FontWeight="Bold"
-                           HorizontalAlignment="Center" />
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button Content="📄 Open Report"
-                            Command="{Binding OpenReportCommand}"
-                            Padding="12,6" Margin="0,0,8,0"
-                            ToolTip="Open the HTML test report" />
-                    <Button Content="🗑 Clean Up Test Files"
-                            Command="{Binding CleanUpCommand}"
-                            Padding="12,6"
-                            ToolTip="Delete all test files from the drive"
-                            Visibility="{Binding CanCleanUp, Converter={StaticResource BoolToVisibilityConverter}}" />
-                </StackPanel>
-            </Grid>
+            <TextBlock Text="{Binding VerdictText}"
+                       Foreground="{Binding VerdictForeground}"
+                       FontSize="22" FontWeight="Bold"
+                       HorizontalAlignment="Center" />
         </Border>
 
         <!-- Row 4: Log Output -->
