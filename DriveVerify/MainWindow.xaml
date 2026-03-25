@@ -10,7 +10,7 @@
         Height="700" Width="900" MinHeight="600" MinWidth="750"
         Background="{StaticResource WindowBackground}"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="16">
+    <Grid x:Name="MainGrid" Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -144,11 +144,28 @@
         </Border>
 
         <!-- Row 2: Heatmap -->
-        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Margin="0,0,0,12">
-            <StackPanel>
-                <TextBlock Text="Heatmap" Style="{StaticResource SectionHeader}" />
-                <views:HeatmapControl RegionStatuses="{Binding RegionStatuses}" Height="48" />
-                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+        <Border x:Name="HeatmapBorder" Grid.Row="2" Style="{StaticResource CardBorder}" Margin="0,0,0,12"
+                MouseLeftButtonDown="HeatmapBorder_MouseDoubleClick" Cursor="Hand">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                    <TextBlock Text="Heatmap" Style="{StaticResource SectionHeader}" Margin="0" DockPanel.Dock="Left" />
+                    <TextBlock x:Name="HeatmapHintText" Text="Double-click to expand"
+                               FontSize="10.5" Foreground="{StaticResource SubtleForeground}"
+                               HorizontalAlignment="Right" VerticalAlignment="Center" />
+                </DockPanel>
+
+                <!-- Heatmap (will expand to fill) -->
+                <views:HeatmapControl x:Name="HeatmapView" Grid.Row="1" RegionStatuses="{Binding RegionStatuses}" Height="48" />
+
+                <!-- Legend -->
+                <StackPanel x:Name="HeatmapLegend" Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
                     <Border Width="12" Height="12" Background="#3C3C3C" CornerRadius="2" Margin="0,0,4,0" />
                     <TextBlock Text="Untested" FontSize="10.5" Foreground="{StaticResource SubtleForeground}" Margin="0,0,12,0" />
                     <Border Width="12" Height="12" Background="#2196F3" CornerRadius="2" Margin="0,0,4,0" />
@@ -160,7 +177,7 @@
                     <Border Width="12" Height="12" Background="#F44336" CornerRadius="2" Margin="0,0,4,0" />
                     <TextBlock Text="Bad" FontSize="10.5" Foreground="{StaticResource SubtleForeground}" />
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Row 3: Verdict Banner -->

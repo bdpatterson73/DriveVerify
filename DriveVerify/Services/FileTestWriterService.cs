@@ -29,8 +29,8 @@ public class WritePhaseResult
 
 public class FileTestWriterService
 {
-    private const long Fat32FileSizeLimit = 1L * 1024 * 1024 * 1024; // 1 GB safe limit for FAT32
-    private const long NonFat32FileSizeLimit = 4L * 1024 * 1024 * 1024; // 4 GB for other FS
+    private const long Fat32FileSizeLimit = 250L * 1024 * 1024; // 250 MB limit for FAT32
+    private const long NonFat32FileSizeLimit = 1L * 1024 * 1024 * 1024; // 1 GB limit for other file systems
 
     public async Task<WritePhaseResult> WriteAsync(
         TestPlan plan,
