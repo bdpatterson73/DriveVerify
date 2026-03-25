@@ -9,7 +9,8 @@
         Title="{Binding WindowTitle}"
         Height="700" Width="900" MinHeight="600" MinWidth="750"
         Background="{StaticResource WindowBackground}"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Icon="images/DriveVerify.ico">
     <Grid x:Name="MainGrid" Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
