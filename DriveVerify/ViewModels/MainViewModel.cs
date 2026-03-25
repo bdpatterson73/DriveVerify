@@ -279,16 +279,8 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        // Reset state
-        LogEntries.Clear();
-        VerdictVisibility = Visibility.Collapsed;
-        VerdictText = string.Empty;
-        ProgressPercent = 0;
-        _lastReportPath = null;
-        _lastTestFolderPath = null;
-        OpenReportCommand.RaiseCanExecuteChanged();
-        CleanUpCommand.RaiseCanExecuteChanged();
-        OnPropertyChanged(nameof(CanCleanUp));
+        // Reset all state to initial values
+        ResetTestState();
 
         // Build TestPlan
         long testSizeBytes = CustomTestSizeGB.HasValue
@@ -594,6 +586,41 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     // ── Helpers ──
+
+    private void ResetTestState()
+    {
+        // Clear log and verdict
+        LogEntries.Clear();
+        VerdictVisibility = Visibility.Collapsed;
+        VerdictText = string.Empty;
+        VerdictBrush = Brushes.Transparent;
+        VerdictForeground = Brushes.White;
+
+        // Reset progress and status
+        ProgressPercent = 0;
+        PhaseText = string.Empty;
+        SpeedText = string.Empty;
+        ElapsedText = string.Empty;
+        EtaText = string.Empty;
+        BlockProgressText = string.Empty;
+        StatusMessage = "Ready";
+
+        // Clear heatmap
+        RegionStatuses = null;
+
+        // Clear last result
+        LastResult = null;
+
+        // Clear report and test folder references
+        _lastReportPath = null;
+        _lastTestFolderPath = null;
+
+        // Update command states
+        OpenReportCommand.RaiseCanExecuteChanged();
+        CleanUpCommand.RaiseCanExecuteChanged();
+        OnPropertyChanged(nameof(CanCleanUp));
+        OnPropertyChanged(nameof(WindowTitle));
+    }
 
     private void Log(string message)
     {
