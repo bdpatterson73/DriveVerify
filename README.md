@@ -172,9 +172,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- Built with **.NET 10** and **WPF**
-- Inspired by tools like H2testw and F3 for fake flash detection
-- Designed to help consumers identify counterfeit storage devices
+- Inspired by **h2testw**, the classic fake flash detection tool, but with a modern WPF interface
+- Built from the ground up with **.NET 10** to provide a contemporary user experience
+- Also inspired by F3 and other storage verification utilities
+- Designed to help consumers identify counterfeit storage devices with an intuitive, visual interface
 
 ## 📧 Contact
 
