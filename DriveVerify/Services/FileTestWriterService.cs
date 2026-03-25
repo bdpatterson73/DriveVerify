@@ -104,8 +104,8 @@ public class FileTestWriterService
                     header.FileIndex = fileIndex;
                 }
 
-                // Serialize header into start of block buffer
-                header.Serialize(blockBuffer);
+                // Serialize header into start of block buffer (slice to avoid clearing payload)
+                header.Serialize(blockBuffer.AsSpan(0, TestBlockHeader.SerializedSize));
 
                 // Report "Writing" status before actually writing
                 progress.Report(new WriteProgress
