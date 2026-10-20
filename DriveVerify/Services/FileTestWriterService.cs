@@ -32,13 +32,17 @@ public class FileTestWriterService
     private const long Fat32FileSizeLimit = 250L * 1024 * 1024; // 250 MB limit for FAT32
     private const long NonFat32FileSizeLimit = 1L * 1024 * 1024 * 1024; // 1 GB limit for other file systems
 
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
+
     public async Task<WritePhaseResult> WriteAsync(
         TestPlan plan,
         IProgress<WriteProgress> progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        RegionStatus[]? liveRegionMap = null)
     {
         var result = new WritePhaseResult();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        long lastReportTicks = 0;
 
         Directory.CreateDirectory(plan.TestFolderPath);
 
@@ -53,9 +57,9 @@ public class FileTestWriterService
         try
         {
             int[] blockIndices = GetBlockIndices(plan, totalBlocks);
-            int payloadLength = plan.BlockSizeBytes - TestBlockHeader.SerializedSize;
-            int blockTotalSize = TestBlockHeader.SerializedSize + payloadLength;
+            int maxPayloadLength = plan.BlockSizeBytes - TestBlockHeader.SerializedSize;
             byte[] blockBuffer = new byte[plan.BlockSizeBytes];
+            var driveInfo = new DriveInfo(Path.GetPathRoot(plan.TestFolderPath)!);
 
             for (int i = 0; i < blockIndices.Length; i++)
             {
@@ -63,6 +67,24 @@ public class FileTestWriterService
 
                 int blockIndex = blockIndices[i];
                 long absoluteOffset = (long)blockIndex * plan.BlockSizeBytes;
+
+                // Shrink the final block so the entire requested size is covered,
+                // even when it isn't a multiple of the block size.
+                int payloadLength = maxPayloadLength;
+                if (plan.Mode == TestMode.FullCapacity)
+                {
+                    long remaining = plan.TestSizeBytes - totalBytesWritten;
+
+                    // Near the end, trust the live free space over the snapshot taken at
+                    // test start (directory entries / cluster rounding consume a little).
+                    if (remaining <= plan.BlockSizeBytes)
+                        remaining = Math.Max(remaining, driveInfo.AvailableFreeSpace);
+
+                    if (remaining <= TestBlockHeader.SerializedSize)
+                        break;
+                    payloadLength = (int)Math.Min(maxPayloadLength, remaining - TestBlockHeader.SerializedSize);
+                }
+                int blockTotalSize = TestBlockHeader.SerializedSize + payloadLength;
 
                 // Generate payload directly into block buffer (no allocation)
                 TestPatternService.GeneratePayloadInto(
@@ -96,7 +118,7 @@ public class FileTestWriterService
 
                     string filePath = Path.Combine(plan.TestFolderPath, $"testdata_{fileIndex:D4}.dat");
                     currentStream = new FileStream(filePath, FileMode.Create, FileAccess.Write,
-                        FileShare.None, bufferSize: 4096,
+                        FileShare.None, bufferSize: 1,
                         FileOptions.SequentialScan | FileOptions.Asynchronous);
                     currentFileSize = 0;
 
@@ -107,47 +129,57 @@ public class FileTestWriterService
                 // Serialize header into start of block buffer (slice to avoid clearing payload)
                 header.Serialize(blockBuffer.AsSpan(0, TestBlockHeader.SerializedSize));
 
-                // Report "Writing" status before actually writing
-                progress.Report(new WriteProgress
-                {
-                    Phase = "Writing",
-                    FileIndex = fileIndex,
-                    BlockIndex = blockIndex,
-                    BytesWritten = totalBytesWritten,
-                    TotalBytes = plan.TestSizeBytes,
-                    SpeedBytesPerSec = 0,
-                    Elapsed = stopwatch.Elapsed,
-                    EstimatedRemaining = TimeSpan.Zero,
-                    RegionIndex = blockIndex,
-                    IsWriting = true
-                });
+                // Mark region as actively writing (UI polls this map on a timer)
+                if (liveRegionMap != null && blockIndex >= 0 && blockIndex < liveRegionMap.Length)
+                    liveRegionMap[blockIndex] = RegionStatus.Writing;
 
                 // Write entire block in a single I/O operation
-                await currentStream!.WriteAsync(blockBuffer.AsMemory(0, blockTotalSize), ct).ConfigureAwait(false);
+                try
+                {
+                    await currentStream!.WriteAsync(blockBuffer.AsMemory(0, blockTotalSize), ct).ConfigureAwait(false);
+                }
+                catch (IOException ex) when (IsDiskFull(ex))
+                {
+                    // Drive is genuinely full — roll back the partial block and finish cleanly.
+                    currentStream!.SetLength(currentFileSize);
+                    if (liveRegionMap != null && blockIndex >= 0 && blockIndex < liveRegionMap.Length)
+                        liveRegionMap[blockIndex] = RegionStatus.Untested;
+                    break;
+                }
                 currentFileSize += blockTotalSize;
                 totalBytesWritten += blockTotalSize;
 
-                // Report progress after write complete
-                double elapsed = stopwatch.Elapsed.TotalSeconds;
-                double speed = elapsed > 0 ? totalBytesWritten / elapsed : 0;
-                double fraction = (double)(i + 1) / blockIndices.Length;
-                TimeSpan eta = fraction > 0
-                    ? TimeSpan.FromSeconds(stopwatch.Elapsed.TotalSeconds / fraction * (1 - fraction))
-                    : TimeSpan.Zero;
+                if (liveRegionMap != null && blockIndex >= 0 && blockIndex < liveRegionMap.Length)
+                    liveRegionMap[blockIndex] = RegionStatus.Good;
 
-                progress.Report(new WriteProgress
+                // Throttled progress report (and always on the final block)
+                long nowTicks = stopwatch.Elapsed.Ticks;
+                bool isLast = i == blockIndices.Length - 1;
+                if (isLast || nowTicks - lastReportTicks >= ProgressInterval.Ticks)
                 {
-                    Phase = "Writing",
-                    FileIndex = fileIndex,
-                    BlockIndex = blockIndex,
-                    BytesWritten = totalBytesWritten,
-                    TotalBytes = plan.TestSizeBytes,
-                    SpeedBytesPerSec = speed,
-                    Elapsed = stopwatch.Elapsed,
-                    EstimatedRemaining = eta,
-                    RegionIndex = blockIndex,
-                    IsWriting = false
-                });
+                    lastReportTicks = nowTicks;
+
+                    double elapsed = stopwatch.Elapsed.TotalSeconds;
+                    double speed = elapsed > 0 ? totalBytesWritten / elapsed : 0;
+                    double fraction = (double)(i + 1) / blockIndices.Length;
+                    TimeSpan eta = fraction > 0
+                        ? TimeSpan.FromSeconds(stopwatch.Elapsed.TotalSeconds / fraction * (1 - fraction))
+                        : TimeSpan.Zero;
+
+                    progress.Report(new WriteProgress
+                    {
+                        Phase = "Writing",
+                        FileIndex = fileIndex,
+                        BlockIndex = blockIndex,
+                        BytesWritten = totalBytesWritten,
+                        TotalBytes = plan.TestSizeBytes,
+                        SpeedBytesPerSec = speed,
+                        Elapsed = stopwatch.Elapsed,
+                        EstimatedRemaining = eta,
+                        RegionIndex = blockIndex,
+                        IsWriting = false
+                    });
+                }
             }
         }
         catch (OperationCanceledException)
@@ -211,6 +243,13 @@ public class FileTestWriterService
     private static int GetSampleCount(int totalBlocks)
     {
         return Math.Max(10, Math.Min(totalBlocks, (int)Math.Sqrt(totalBlocks) * 4));
+    }
+
+    private static bool IsDiskFull(IOException ex)
+    {
+        const int ERROR_DISK_FULL = unchecked((int)0x80070070);
+        const int ERROR_HANDLE_DISK_FULL = unchecked((int)0x80070027);
+        return ex.HResult == ERROR_DISK_FULL || ex.HResult == ERROR_HANDLE_DISK_FULL;
     }
 
     private static long GetFileSizeLimit(string fileSystem)

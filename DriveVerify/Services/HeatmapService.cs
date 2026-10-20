@@ -14,15 +14,15 @@ public static class HeatmapService
 {
     private static readonly Dictionary<RegionStatus, string> ColorMap = new()
     {
-        [RegionStatus.Untested] = "#3C3C3C",
-        [RegionStatus.Writing] = "#2196F3",
-        [RegionStatus.Verifying] = "#FF9800",
-        [RegionStatus.Good] = "#4CAF50",
-        [RegionStatus.Bad] = "#F44336"
+        [RegionStatus.Untested] = "#1C222C",
+        [RegionStatus.Writing] = "#00B0FF",
+        [RegionStatus.Verifying] = "#FFB300",
+        [RegionStatus.Good] = "#39FF6A",
+        [RegionStatus.Bad] = "#FF3B4A"
     };
 
     public static string GetColor(RegionStatus status) =>
-        ColorMap.GetValueOrDefault(status, "#3C3C3C");
+        ColorMap.GetValueOrDefault(status, "#1C222C");
 
     public static List<HeatmapCell> BuildCells(RegionStatus[] regionStatuses)
     {

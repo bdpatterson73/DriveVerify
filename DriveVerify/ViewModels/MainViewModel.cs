@@ -15,9 +15,11 @@ namespace DriveVerify.ViewModels;
 public class MainViewModel : INotifyPropertyChanged
 {
     private readonly DispatcherTimer _elapsedTimer;
+    private readonly DispatcherTimer _heatmapTimer;
     private DateTime _testStartTime;
     private string? _lastReportPath;
     private string? _lastTestFolderPath;
+    private RegionStatus[]? _liveRegionMap;
 
     public MainViewModel()
     {
@@ -43,6 +45,13 @@ public class MainViewModel : INotifyPropertyChanged
                 ElapsedText = TimeFormatter.Format(DateTime.UtcNow - _testStartTime);
                 OnPropertyChanged(nameof(WindowTitle));
             }
+        };
+
+        _heatmapTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(66) };
+        _heatmapTimer.Tick += (_, _) =>
+        {
+            if (_liveRegionMap is { } map)
+                RegionStatuses = (RegionStatus[])map.Clone();
         };
 
         SelectedTestMode = TestMode.FullCapacity;
@@ -124,7 +133,47 @@ public class MainViewModel : INotifyPropertyChanged
     public string PhaseText
     {
         get => _phaseText;
-        set { _phaseText = value; OnPropertyChanged(); OnPropertyChanged(nameof(WindowTitle)); }
+        set
+        {
+            _phaseText = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(WindowTitle));
+            OnPropertyChanged(nameof(PhaseColor));
+            OnPropertyChanged(nameof(PhaseBrush));
+        }
+    }
+
+    public Color PhaseColor => _phaseText switch
+    {
+        "Writing" => Color.FromRgb(0x00, 0xB0, 0xFF),
+        "Verifying" => Color.FromRgb(0xFF, 0xB3, 0x00),
+        _ => Color.FromRgb(0x39, 0xFF, 0x6A)
+    };
+
+    public Brush PhaseBrush => new SolidColorBrush(PhaseColor);
+
+    private readonly List<double> _speedHistory = [];
+    private DateTime _lastSpeedSampleUtc;
+    private const int MaxSpeedSamples = 180;
+
+    private double[] _speedSamples = [];
+    public double[] SpeedSamples
+    {
+        get => _speedSamples;
+        private set { _speedSamples = value; OnPropertyChanged(); }
+    }
+
+    private void AddSpeedSample(double bytesPerSec)
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _lastSpeedSampleUtc).TotalMilliseconds < 250)
+            return;
+        _lastSpeedSampleUtc = now;
+
+        _speedHistory.Add(bytesPerSec);
+        if (_speedHistory.Count > MaxSpeedSamples)
+            _speedHistory.RemoveAt(0);
+        SpeedSamples = [.. _speedHistory];
     }
 
     private string _speedText = string.Empty;
@@ -282,10 +331,21 @@ public class MainViewModel : INotifyPropertyChanged
         // Reset all state to initial values
         ResetTestState();
 
-        // Build TestPlan
+        // Build TestPlan — use a fresh free-space reading, not the cached value
+        // from the last drive refresh (it may be stale by now).
+        long freshFreeSpace;
+        try
+        {
+            freshFreeSpace = new DriveInfo(SelectedDrive.DriveLetter).AvailableFreeSpace;
+        }
+        catch
+        {
+            freshFreeSpace = SelectedDrive.FreeSpace;
+        }
+
         long testSizeBytes = CustomTestSizeGB.HasValue
             ? (long)(CustomTestSizeGB.Value * 1024 * 1024 * 1024)
-            : SelectedDrive.FreeSpace;
+            : freshFreeSpace;
 
         string testFolderPath = Path.Combine(SelectedDrive.DriveLetter + "\\", "FlashDriveTester_Test");
 
@@ -303,12 +363,13 @@ public class MainViewModel : INotifyPropertyChanged
         _lastTestFolderPath = testFolderPath;
 
         int totalBlocks = plan.ComputeTotalBlocks();
-        RegionStatuses = new RegionStatus[totalBlocks];
-        Array.Fill(RegionStatuses, RegionStatus.Untested);
-        OnPropertyChanged(nameof(RegionStatuses));
+        _liveRegionMap = new RegionStatus[totalBlocks];
+        Array.Fill(_liveRegionMap, RegionStatus.Untested);
+        RegionStatuses = (RegionStatus[])_liveRegionMap.Clone();
 
         _testStartTime = DateTime.UtcNow;
         _elapsedTimer.Start();
+        _heatmapTimer.Start();
 
         Log($"Test started: {SelectedDrive.DisplayName}");
         Log($"Mode: {plan.Mode}, Block size: {SizeFormatter.Format(plan.BlockSizeBytes)}, Test size: {SizeFormatter.Format(plan.TestSizeBytes)}");
@@ -327,35 +388,17 @@ public class MainViewModel : INotifyPropertyChanged
 
             var writeProgress = new Progress<WriteProgress>(p =>
             {
-                if (p.RegionIndex >= 0 && p.RegionIndex < RegionStatuses!.Length)
-                {
-                    if (p.IsWriting)
-                    {
-                        // Set to blue "Writing" status (don't update stats yet)
-                        RegionStatuses[p.RegionIndex] = RegionStatus.Writing;
-                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
-                    }
-                    else
-                    {
-                        // Write complete - update stats and set to green "Good"
-                        double pct = p.TotalBytes > 0 ? (double)p.BytesWritten / p.TotalBytes * 100 : 0;
-                        ProgressPercent = pct;
-                        SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
-                        ElapsedText = TimeFormatter.Format(p.Elapsed);
-                        EtaText = TimeFormatter.Format(p.EstimatedRemaining);
-                        BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks}";
-
-                        RegionStatuses[p.RegionIndex] = RegionStatus.Good;
-                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
-
-                        if (p.BlockIndex % 100 == 0)
-                            Log($"Writing block {p.BlockIndex + 1}/{totalBlocks} — {SizeFormatter.Format(p.BytesWritten)} — {SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s");
-                    }
-                }
+                double pct = p.TotalBytes > 0 ? (double)p.BytesWritten / p.TotalBytes * 100 : 0;
+                ProgressPercent = pct;
+                SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
+                ElapsedText = TimeFormatter.Format(p.Elapsed);
+                EtaText = TimeFormatter.Format(p.EstimatedRemaining);
+                BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks}";
+                AddSpeedSample(p.SpeedBytesPerSec);
             });
 
             var writer = new FileTestWriterService();
-            writeResult = await Task.Run(() => writer.WriteAsync(plan, writeProgress, ct));
+            writeResult = await Task.Run(() => writer.WriteAsync(plan, writeProgress, ct, _liveRegionMap));
 
             Log($"=== Write Phase Complete: {SizeFormatter.Format(writeResult.TotalBytesWritten)} in {TimeFormatter.Format(writeResult.ElapsedTime)} ({SizeFormatter.Format((long)writeResult.AverageSpeedBytesPerSec)}/s) ===");
 
@@ -371,44 +414,31 @@ public class MainViewModel : INotifyPropertyChanged
             PhaseText = "Verifying";
             StatusMessage = "Verifying test data...";
             ProgressPercent = 0;
+            _speedHistory.Clear();
+            SpeedSamples = [];
             Log("=== Verify Phase Started ===");
 
             var verifyProgress = new Progress<VerifyProgress>(p =>
             {
-                if (p.RegionIndex >= 0 && p.RegionIndex < RegionStatuses!.Length)
-                {
-                    if (p.IsVerifying)
-                    {
-                        // Set to orange "Verifying" status (don't update stats yet)
-                        RegionStatuses[p.RegionIndex] = RegionStatus.Verifying;
-                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
-                    }
-                    else
-                    {
-                        // Verification complete - update stats and set final status
-                        double pct = p.TotalBytes > 0 ? (double)p.BytesVerified / p.TotalBytes * 100 : 0;
-                        ProgressPercent = pct;
-                        SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
-                        ElapsedText = TimeFormatter.Format(p.Elapsed);
-                        EtaText = TimeFormatter.Format(p.EstimatedRemaining);
-                        BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks} ({p.IssueCount} issues)";
+                double pct = p.TotalBytes > 0 ? (double)p.BytesVerified / p.TotalBytes * 100 : 0;
+                ProgressPercent = pct;
+                SpeedText = $"{SizeFormatter.Format((long)p.SpeedBytesPerSec)}/s";
+                ElapsedText = TimeFormatter.Format(p.Elapsed);
+                EtaText = TimeFormatter.Format(p.EstimatedRemaining);
+                BlockProgressText = $"Block {p.BlockIndex + 1}/{totalBlocks} ({p.IssueCount} issues)";
+                AddSpeedSample(p.SpeedBytesPerSec);
 
-                        RegionStatuses[p.RegionIndex] = p.RegionFailed ? RegionStatus.Bad : RegionStatus.Good;
-                        RegionStatuses = (RegionStatus[])RegionStatuses.Clone();
-
-                        if (p.BlockIndex % 100 == 0)
-                            Log($"Verifying block {p.BlockIndex + 1}/{totalBlocks} — {SizeFormatter.Format(p.BytesVerified)} — {p.IssueCount} issues");
-                    }
-                }
+                if (p.RegionFailed)
+                    Log($"Issue found in block {p.BlockIndex + 1}/{totalBlocks} — {p.IssueCount} issues total");
             });
 
             var verifier = new FileTestVerifierService();
-            verifyResult = await Task.Run(() => verifier.VerifyAsync(plan, verifyProgress, ct));
+            verifyResult = await Task.Run(() => verifier.VerifyAsync(plan, verifyProgress, ct, _liveRegionMap));
 
             Log($"=== Verify Phase Complete: {SizeFormatter.Format(verifyResult.TotalBytesVerified)} in {TimeFormatter.Format(verifyResult.ElapsedTime)} ({SizeFormatter.Format((long)verifyResult.AverageSpeedBytesPerSec)}/s) ===");
 
-            RegionStatuses = verifyResult.RegionMap;
-            OnPropertyChanged(nameof(RegionStatuses));
+            _liveRegionMap = verifyResult.RegionMap;
+            RegionStatuses = (RegionStatus[])verifyResult.RegionMap.Clone();
 
             // Determine verdict
             verdict = DetermineVerdict(verifyResult);
@@ -441,6 +471,9 @@ public class MainViewModel : INotifyPropertyChanged
         finally
         {
             _elapsedTimer.Stop();
+            _heatmapTimer.Stop();
+            if (_liveRegionMap is { } finalMap)
+                RegionStatuses = (RegionStatus[])finalMap.Clone();
         }
 
         // Build TestResult
@@ -480,6 +513,21 @@ public class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log($"Failed to generate report: {ex.Message}");
+        }
+
+        // Auto-clean test files from the drive now that the test is finished
+        try
+        {
+            if (_lastTestFolderPath is not null && Directory.Exists(_lastTestFolderPath))
+            {
+                await Task.Run(() => Directory.Delete(_lastTestFolderPath, recursive: true));
+                Log($"Test files cleaned up: {_lastTestFolderPath}");
+                _lastTestFolderPath = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Auto cleanup failed: {ex.Message} — use the Clean Up button to retry.");
         }
 
         // Update cleanup button state
@@ -607,6 +655,10 @@ public class MainViewModel : INotifyPropertyChanged
 
         // Clear heatmap
         RegionStatuses = null;
+
+        // Clear speed graph
+        _speedHistory.Clear();
+        SpeedSamples = [];
 
         // Clear last result
         LastResult = null;

@@ -31,13 +31,17 @@ public class VerifyPhaseResult
 
 public class FileTestVerifierService
 {
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
+
     public async Task<VerifyPhaseResult> VerifyAsync(
         TestPlan plan,
         IProgress<VerifyProgress> progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        RegionStatus[]? liveRegionMap = null)
     {
         var issues = new ConcurrentBag<VerificationIssue>();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        long lastReportTicks = 0;
 
         int totalBlocks = plan.ComputeTotalBlocks();
         var regionMap = new RegionStatus[totalBlocks];
@@ -117,25 +121,12 @@ public class FileTestVerifierService
                     int regionIndex = header.BlockIndex;
                     bool blockFailed = false;
 
-                    // Update region to verifying and report progress
+                    // Update region to verifying (UI polls the live map on a timer)
                     if (regionIndex >= 0 && regionIndex < regionMap.Length)
                     {
                         regionMap[regionIndex] = RegionStatus.Verifying;
-                        // Report "verifying" status to UI
-                        progress.Report(new VerifyProgress
-                        {
-                            Phase = "Verifying",
-                            BlockIndex = header.BlockIndex,
-                            BytesVerified = Interlocked.Read(ref totalBytesVerified),
-                            TotalBytes = totalBytesInFiles,
-                            SpeedBytesPerSec = 0,
-                            Elapsed = stopwatch.Elapsed,
-                            EstimatedRemaining = TimeSpan.Zero,
-                            IssueCount = issues.Count,
-                            RegionIndex = regionIndex,
-                            RegionFailed = false,
-                            IsVerifying = true
-                        });
+                        if (liveRegionMap != null && regionIndex < liveRegionMap.Length)
+                            liveRegionMap[regionIndex] = RegionStatus.Verifying;
                     }
 
                     // Validate magic signature
@@ -165,7 +156,7 @@ public class FileTestVerifierService
                     }
 
                     // Read payload
-                    if (header.PayloadLength <= 0 || header.PayloadLength > plan.BlockSizeBytes)
+                    if (header.PayloadLength <= 0 || header.PayloadLength > plan.BlockSizeBytes - TestBlockHeader.SerializedSize)
                     {
                         issues.Add(new VerificationIssue
                         {
@@ -238,15 +229,27 @@ public class FileTestVerifierService
 
                     // Update region status
                     if (regionIndex >= 0 && regionIndex < regionMap.Length)
+                    {
                         regionMap[regionIndex] = blockFailed ? RegionStatus.Bad : RegionStatus.Good;
+                        if (liveRegionMap != null && regionIndex < liveRegionMap.Length)
+                            liveRegionMap[regionIndex] = blockFailed ? RegionStatus.Bad : RegionStatus.Good;
+                    }
 
                     long blockBytes = TestBlockHeader.SerializedSize + payloadBytesRead;
-                    Interlocked.Add(ref totalBytesVerified, blockBytes);
+                    long bytesSoFar = Interlocked.Add(ref totalBytesVerified, blockBytes);
                     Interlocked.Increment(ref blocksVerified);
 
-                    ReportVerifyProgress(progress, stopwatch, header.BlockIndex,
-                        Interlocked.Read(ref totalBytesVerified), totalBytesInFiles,
-                        issues.Count, regionIndex, blockFailed);
+                    // Throttled progress report (always report failures immediately)
+                    long nowTicks = stopwatch.Elapsed.Ticks;
+                    long last = Interlocked.Read(ref lastReportTicks);
+                    if (blockFailed ||
+                        (nowTicks - last >= ProgressInterval.Ticks &&
+                         Interlocked.CompareExchange(ref lastReportTicks, nowTicks, last) == last))
+                    {
+                        ReportVerifyProgress(progress, stopwatch, header.BlockIndex,
+                            bytesSoFar, totalBytesInFiles,
+                            issues.Count, regionIndex, blockFailed);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -266,6 +269,10 @@ public class FileTestVerifierService
         });
 
         stopwatch.Stop();
+
+        ReportVerifyProgress(progress, stopwatch, blocksVerified,
+            Interlocked.Read(ref totalBytesVerified), totalBytesInFiles,
+            issues.Count, -1, false);
 
         var sortedIssues = issues.OrderBy(i => i.AbsoluteOffset).ToList();
 

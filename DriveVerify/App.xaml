@@ -9,15 +9,76 @@
         <local:BytesToSizeConverter x:Key="BytesToSizeConverter" />
         <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
-        <!-- Color palette -->
-        <SolidColorBrush x:Key="WindowBackground" Color="#1E1E1E" />
-        <SolidColorBrush x:Key="CardBackground" Color="#252526" />
-        <SolidColorBrush x:Key="CardBorderBrush" Color="#333333" />
-        <SolidColorBrush x:Key="PrimaryForeground" Color="#D4D4D4" />
-        <SolidColorBrush x:Key="SubtleForeground" Color="#808080" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#569CD6" />
-        <SolidColorBrush x:Key="ControlBackground" Color="#333333" />
-        <SolidColorBrush x:Key="ControlBorder" Color="#444444" />
+        <!-- Color palette: near-black neon theme -->
+        <SolidColorBrush x:Key="WindowBackground" Color="#0A0C10" />
+        <SolidColorBrush x:Key="CardBackground" Color="#10131A" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#1E3A45" />
+        <SolidColorBrush x:Key="PrimaryForeground" Color="#D8E6EC" />
+        <SolidColorBrush x:Key="SubtleForeground" Color="#6B7B85" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#00E5FF" />
+        <SolidColorBrush x:Key="AccentDimBrush" Color="#0A6E7A" />
+        <SolidColorBrush x:Key="NeonGreenBrush" Color="#39FF6A" />
+        <SolidColorBrush x:Key="ControlBackground" Color="#161B24" />
+        <SolidColorBrush x:Key="ControlBorder" Color="#24404C" />
+
+        <!-- Glow effects (ShadowDepth=0 => pure neon glow) -->
+        <DropShadowEffect x:Key="CyanGlow" Color="#00E5FF" BlurRadius="12" ShadowDepth="0" Opacity="0.65" />
+        <DropShadowEffect x:Key="CyanGlowSoft" Color="#00E5FF" BlurRadius="18" ShadowDepth="0" Opacity="0.30" />
+        <DropShadowEffect x:Key="GreenGlow" Color="#39FF6A" BlurRadius="14" ShadowDepth="0" Opacity="0.70" />
+        <DropShadowEffect x:Key="TextGlow" Color="#00E5FF" BlurRadius="10" ShadowDepth="0" Opacity="0.85" />
+
+        <!-- Title bar caption button -->
+        <Style x:Key="CaptionButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource SubtleForeground}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1B2733" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0A6E7A" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Close caption button: red hover -->
+        <Style x:Key="CaptionCloseButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#7A1020" />
+                                <Setter Property="Foreground" Value="#FF5C6A" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#A3162B" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- Card border style -->
         <Style x:Key="CardBorder" TargetType="Border">
@@ -26,6 +87,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="12" />
+            <Setter Property="Effect" Value="{StaticResource CyanGlowSoft}" />
         </Style>
 
         <!-- Section header -->
@@ -34,6 +96,7 @@
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Effect" Value="{StaticResource TextGlow}" />
         </Style>
 
         <!-- Default TextBlock -->
@@ -52,7 +115,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="4" Padding="{TemplateBinding Padding}">
@@ -60,13 +123,17 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#444444" />
+                                <Setter TargetName="Bd" Property="Background" Value="#1B2733" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="Effect" Value="{StaticResource CyanGlow}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#555555" />
+                                <Setter TargetName="Bd" Property="Background" Value="#0A6E7A" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.4" />
+                                <Setter Property="Opacity" Value="0.35" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -93,7 +160,8 @@
             </Grid>
             <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#444444" />
+                    <Setter TargetName="Border" Property="Background" Value="#1B2733" />
+                    <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                 </Trigger>
             </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -156,8 +224,8 @@
                                       MinWidth="{TemplateBinding ActualWidth}"
                                       MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                     <Border x:Name="DropDownBorder"
-                                            Background="#2D2D2D"
-                                            BorderBrush="{StaticResource ControlBorder}"
+                                            Background="#10131A"
+                                            BorderBrush="{StaticResource AccentDimBrush}"
                                             BorderThickness="1" CornerRadius="4" />
                                     <ScrollViewer Margin="4" SnapsToDevicePixels="True">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -194,10 +262,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#3F3F46" />
+                                <Setter TargetName="Border" Property="Background" Value="#1B2733" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#2A4A6B" />
+                                <Setter TargetName="Border" Property="Background" Value="#0A3A44" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -210,15 +278,44 @@
             <Setter Property="Background" Value="{StaticResource ControlBackground}" />
             <Setter Property="Foreground" Value="{StaticResource PrimaryForeground}" />
             <Setter Property="BorderBrush" Value="{StaticResource ControlBorder}" />
-            <Setter Property="CaretBrush" Value="{StaticResource PrimaryForeground}" />
+            <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="SelectionBrush" Value="{StaticResource AccentDimBrush}" />
             <Setter Property="Padding" Value="6,4" />
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                    <Setter Property="Effect" Value="{StaticResource CyanGlow}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
-        <!-- ProgressBar -->
+        <!-- ProgressBar: neon-green bar with glow -->
         <Style TargetType="ProgressBar">
-            <Setter Property="Background" Value="#333333" />
-            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Background" Value="#121A14" />
+            <Setter Property="Foreground" Value="{StaticResource NeonGreenBrush}" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid>
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="#1E4A2A" BorderThickness="1" CornerRadius="4" />
+                            <Border x:Name="PART_Track" Margin="2" />
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left" Margin="2"
+                                    CornerRadius="3"
+                                    Effect="{StaticResource GreenGlow}">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#5CFF8C" Offset="0" />
+                                        <GradientStop Color="#1FBF4E" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- ListBox -->

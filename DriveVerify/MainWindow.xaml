@@ -9,9 +9,38 @@
         Title="{Binding WindowTitle}"
         Height="700" Width="900" MinHeight="600" MinWidth="750"
         Background="{StaticResource WindowBackground}"
+        WindowStyle="None"
         WindowStartupLocation="CenterScreen"
         Icon="Images/DriveVerify.ico">
-    <Grid x:Name="MainGrid" Margin="16">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="34" ResizeBorderThickness="6" CornerRadius="8" GlassFrameThickness="0" />
+    </WindowChrome.WindowChrome>
+
+    <Border x:Name="WindowFrame" Background="{StaticResource WindowBackground}"
+            BorderBrush="#1E3A45" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="34" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Custom title bar -->
+            <DockPanel Grid.Row="0" LastChildFill="False">
+                <Image Source="Images/DriveVerify.ico" Width="16" Height="16" Margin="12,0,8,0"
+                       VerticalAlignment="Center" DockPanel.Dock="Left" />
+                <TextBlock Text="{Binding WindowTitle}" VerticalAlignment="Center" DockPanel.Dock="Left"
+                           FontSize="12" FontWeight="SemiBold"
+                           Foreground="{StaticResource AccentBrush}"
+                           Effect="{StaticResource TextGlow}" />
+                <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CaptionCloseButton}"
+                        DockPanel.Dock="Right" Click="CloseButton_Click" />
+                <Button x:Name="MaximizeButton" Content="&#xE922;" Style="{StaticResource CaptionButton}"
+                        DockPanel.Dock="Right" Click="MaximizeButton_Click" />
+                <Button x:Name="MinimizeButton" Content="&#xE921;" Style="{StaticResource CaptionButton}"
+                        DockPanel.Dock="Right" Click="MinimizeButton_Click" />
+            </DockPanel>
+
+            <Grid x:Name="MainGrid" Grid.Row="1" Margin="16,8,16,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -30,17 +59,22 @@
             </Grid.ColumnDefinitions>
 
             <!-- Drive Selection -->
-            <Border Grid.Column="0" Style="{StaticResource CardBorder}">
+            <Border Grid.Column="0" Style="{StaticResource CardBorder}" VerticalAlignment="Top">
                 <StackPanel>
                     <TextBlock Text="Drive Selection" Style="{StaticResource SectionHeader}" />
-                    <ComboBox ItemsSource="{Binding Drives}"
-                              SelectedItem="{Binding SelectedDrive}"
-                              IsEnabled="{Binding IsNotRunning}"
-                              Margin="0,0,0,8" />
-                    <Button Content="⟳ Refresh Drives"
-                            Command="{Binding RefreshDrivesCommand}"
-                            IsEnabled="{Binding IsNotRunning}"
-                            Margin="0,0,0,8" />
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding Drives}"
+                                  SelectedItem="{Binding SelectedDrive}"
+                                  IsEnabled="{Binding IsNotRunning}" />
+                        <Button Grid.Column="1" Content="⟳" Width="34" Margin="6,0,0,0"
+                                ToolTip="Refresh Drives"
+                                Command="{Binding RefreshDrivesCommand}"
+                                IsEnabled="{Binding IsNotRunning}" />
+                    </Grid>
                     <TextBlock Text="{Binding DriveInfoText}"
                                Foreground="{StaticResource SubtleForeground}"
                                FontSize="11.5" TextWrapping="Wrap" />
@@ -67,29 +101,37 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Mode:" VerticalAlignment="Center" Margin="0,0,8,6" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Mode:" VerticalAlignment="Center" Margin="0,0,8,4" />
                         <ComboBox Grid.Row="0" Grid.Column="1"
                                   ItemsSource="{Binding TestModes}"
                                   SelectedItem="{Binding SelectedTestMode}"
-                                  IsEnabled="{Binding IsNotRunning}" Margin="0,0,0,6" />
+                                  IsEnabled="{Binding IsNotRunning}" Margin="0,0,0,4" />
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Block size (MB):" VerticalAlignment="Center" Margin="0,0,8,6" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Block size (MB):" VerticalAlignment="Center" Margin="0,0,8,4" />
                         <TextBox Grid.Row="1" Grid.Column="1"
                                  Text="{Binding BlockSizeMB, UpdateSourceTrigger=PropertyChanged}"
-                                 IsEnabled="{Binding IsNotRunning}" Margin="0,0,0,6" />
+                                 IsEnabled="{Binding IsNotRunning}" Margin="0,0,0,4" />
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Test size (GB):" VerticalAlignment="Center" Margin="0,0,8,6" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Test size (GB):" VerticalAlignment="Center" Margin="0,0,8,4" />
                         <TextBox Grid.Row="2" Grid.Column="1"
                                  Text="{Binding CustomTestSizeGB, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-                                 IsEnabled="{Binding IsNotRunning}" Margin="0,0,0,6" />
+                                 IsEnabled="{Binding IsNotRunning}" Margin="0,0,0,4" />
 
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Verify threads:" VerticalAlignment="Center" Margin="0,0,8,6" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Verify threads:" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBox Grid.Row="3" Grid.Column="1"
                                  Text="{Binding VerifyThreadCount, UpdateSourceTrigger=PropertyChanged}"
                                  IsEnabled="{Binding IsNotRunning}" Margin="0,0,0,0" />
                     </Grid>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button Content="📄 Open Report"
+                                Command="{Binding OpenReportCommand}"
+                                Margin="0,0,8,0"
+                                ToolTip="Open the HTML test report" />
+                        <Button Content="🗑 Clean Up"
+                                Command="{Binding CleanUpCommand}"
+                                Margin="0,0,8,0"
+                                ToolTip="Delete all test files from the drive" />
                         <Button Content="▶ Start Test"
                                 Command="{Binding StartTestCommand}"
                                 Width="110" Margin="0,0,8,0"
@@ -98,50 +140,84 @@
                                 Command="{Binding CancelCommand}"
                                 Width="90" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                        <Button Content="📄 Open Report"
-                                Command="{Binding OpenReportCommand}"
-                                Margin="0,0,8,0"
-                                ToolTip="Open the HTML test report" />
-                        <Button Content="🗑 Clean Up Test Files"
-                                Command="{Binding CleanUpCommand}"
-                                ToolTip="Delete all test files from the drive" />
-                    </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>
 
-        <!-- Row 1: Progress -->
+        <!-- Row 1: Progress dashboard -->
         <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,0,0,12">
-            <StackPanel>
-                <TextBlock Text="Progress" Style="{StaticResource SectionHeader}" />
-                <Grid Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding PhaseText}" FontWeight="SemiBold" Margin="0,0,12,0" />
-                    <ProgressBar Grid.Column="1" Value="{Binding ProgressPercent}" Minimum="0" Maximum="100"
-                                 Height="18" />
-                    <TextBlock Grid.Column="2" Margin="12,0,0,0">
-                        <Run Text="{Binding ProgressPercent, StringFormat={}{0:F1}%}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: giant phase-colored percent readout -->
+                <StackPanel Grid.Column="0" Margin="0,0,20,0" VerticalAlignment="Center" MinWidth="170">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="9" Height="9" Fill="{Binding PhaseBrush}"
+                                 VerticalAlignment="Center" Margin="0,0,7,0"
+                                 Effect="{StaticResource CyanGlow}"
+                                 Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="PulseStoryboard">
+                                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                         From="1.0" To="0.25" Duration="0:0:0.7" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="PulseStoryboard" />
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Text="{Binding PhaseText}" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{Binding PhaseBrush}" Effect="{StaticResource TextGlow}" />
+                    </StackPanel>
+                    <TextBlock FontFamily="Consolas" FontWeight="Bold" FontSize="44" Margin="0,-2,0,0"
+                               Foreground="{Binding PhaseBrush}" Effect="{StaticResource TextGlow}">
+                        <Run Text="{Binding ProgressPercent, StringFormat={}{0:F1}, Mode=OneWay}" /><Run Text="%" FontSize="22" />
                     </TextBlock>
-                </Grid>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding BlockProgressText}" Margin="0,0,16,0"
-                               Foreground="{StaticResource SubtleForeground}" FontSize="11.5" />
-                    <TextBlock Margin="0,0,16,0" Foreground="{StaticResource SubtleForeground}" FontSize="11.5">
-                        <Run Text="Speed:" /> <Run Text="{Binding SpeedText, Mode=OneWay}" />
-                    </TextBlock>
-                    <TextBlock Margin="0,0,16,0" Foreground="{StaticResource SubtleForeground}" FontSize="11.5">
-                        <Run Text="Elapsed:" /> <Run Text="{Binding ElapsedText, Mode=OneWay}" />
-                    </TextBlock>
-                    <TextBlock Foreground="{StaticResource SubtleForeground}" FontSize="11.5">
-                        <Run Text="ETA:" /> <Run Text="{Binding EtaText, Mode=OneWay}" />
-                    </TextBlock>
+                    <TextBlock Text="{Binding BlockProgressText}"
+                               Foreground="{StaticResource SubtleForeground}" FontSize="11.5" FontFamily="Consolas" />
                 </StackPanel>
-            </StackPanel>
+
+                <!-- Right: live speed graph + bar + stats -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="58" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <views:SpeedGraphControl Grid.Row="0"
+                                             Samples="{Binding SpeedSamples}"
+                                             GraphColor="{Binding PhaseColor}" />
+
+                    <ProgressBar Grid.Row="1" Value="{Binding ProgressPercent}" Minimum="0" Maximum="100"
+                                 Height="8" Margin="0,8,0,8" />
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                        <TextBlock Margin="0,0,20,0" FontSize="11.5" FontFamily="Consolas">
+                            <Run Text="SPEED" Foreground="{StaticResource SubtleForeground}" /> <Run Text="{Binding SpeedText, Mode=OneWay}" Foreground="{StaticResource NeonGreenBrush}" FontWeight="Bold" FontSize="13" />
+                        </TextBlock>
+                        <TextBlock Margin="0,0,20,0" FontSize="11.5" FontFamily="Consolas">
+                            <Run Text="ELAPSED" Foreground="{StaticResource SubtleForeground}" /> <Run Text="{Binding ElapsedText, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="13" />
+                        </TextBlock>
+                        <TextBlock FontSize="11.5" FontFamily="Consolas">
+                            <Run Text="ETA" Foreground="{StaticResource SubtleForeground}" /> <Run Text="{Binding EtaText, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="13" />
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Grid>
         </Border>
 
         <!-- Row 2: Heatmap -->
@@ -167,15 +243,23 @@
 
                 <!-- Legend -->
                 <StackPanel x:Name="HeatmapLegend" Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
-                    <Border Width="12" Height="12" Background="#3C3C3C" CornerRadius="2" Margin="0,0,4,0" />
+                    <Border Width="12" Height="12" Background="#1C222C" CornerRadius="2" Margin="0,0,4,0" />
                     <TextBlock Text="Untested" FontSize="10.5" Foreground="{StaticResource SubtleForeground}" Margin="0,0,12,0" />
-                    <Border Width="12" Height="12" Background="#2196F3" CornerRadius="2" Margin="0,0,4,0" />
+                    <Border Width="12" Height="12" Background="#00B0FF" CornerRadius="2" Margin="0,0,4,0">
+                        <Border.Effect><DropShadowEffect Color="#00B0FF" BlurRadius="8" ShadowDepth="0" Opacity="0.8" /></Border.Effect>
+                    </Border>
                     <TextBlock Text="Writing" FontSize="10.5" Foreground="{StaticResource SubtleForeground}" Margin="0,0,12,0" />
-                    <Border Width="12" Height="12" Background="#FF9800" CornerRadius="2" Margin="0,0,4,0" />
+                    <Border Width="12" Height="12" Background="#FFB300" CornerRadius="2" Margin="0,0,4,0">
+                        <Border.Effect><DropShadowEffect Color="#FFB300" BlurRadius="8" ShadowDepth="0" Opacity="0.8" /></Border.Effect>
+                    </Border>
                     <TextBlock Text="Verifying" FontSize="10.5" Foreground="{StaticResource SubtleForeground}" Margin="0,0,12,0" />
-                    <Border Width="12" Height="12" Background="#4CAF50" CornerRadius="2" Margin="0,0,4,0" />
+                    <Border Width="12" Height="12" Background="#39FF6A" CornerRadius="2" Margin="0,0,4,0">
+                        <Border.Effect><DropShadowEffect Color="#39FF6A" BlurRadius="8" ShadowDepth="0" Opacity="0.8" /></Border.Effect>
+                    </Border>
                     <TextBlock Text="Good" FontSize="10.5" Foreground="{StaticResource SubtleForeground}" Margin="0,0,12,0" />
-                    <Border Width="12" Height="12" Background="#F44336" CornerRadius="2" Margin="0,0,4,0" />
+                    <Border Width="12" Height="12" Background="#FF3B4A" CornerRadius="2" Margin="0,0,4,0">
+                        <Border.Effect><DropShadowEffect Color="#FF3B4A" BlurRadius="8" ShadowDepth="0" Opacity="0.8" /></Border.Effect>
+                    </Border>
                     <TextBlock Text="Bad" FontSize="10.5" Foreground="{StaticResource SubtleForeground}" />
                 </StackPanel>
             </Grid>
@@ -184,11 +268,16 @@
         <!-- Row 3: Verdict Banner -->
         <Border Grid.Row="3" Background="{Binding VerdictBrush}" CornerRadius="8" Padding="16"
                 Margin="0,0,0,12"
+                Effect="{StaticResource CyanGlowSoft}"
                 Visibility="{Binding VerdictVisibility}">
             <TextBlock Text="{Binding VerdictText}"
                        Foreground="{Binding VerdictForeground}"
                        FontSize="22" FontWeight="Bold"
-                       HorizontalAlignment="Center" />
+                       HorizontalAlignment="Center">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="#FFFFFF" BlurRadius="14" ShadowDepth="0" Opacity="0.5" />
+                </TextBlock.Effect>
+            </TextBlock>
         </Border>
 
         <!-- Row 4: Log Output -->
@@ -205,7 +294,8 @@
         </Border>
 
         <!-- Row 5: Status Bar -->
-        <Border Grid.Row="5" Background="#1A1A1A" CornerRadius="4" Padding="8,4">
+        <Border Grid.Row="5" Background="#0D1016" BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="8,4">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource SubtleForeground}" FontSize="11.5" Margin="0,0,16,0" />
                 <TextBlock Foreground="{StaticResource SubtleForeground}" FontSize="11.5">
@@ -216,7 +306,9 @@
                     <Run Text="Free:" />
                     <Run Text="{Binding SelectedDrive.FreeSpace, Mode=OneWay, FallbackValue='—', Converter={StaticResource BytesToSizeConverter}}" />
                 </TextBlock>
-            </StackPanel>
-        </Border>
-    </Grid>
-</Window>
+                            </StackPanel>
+                        </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Window>
